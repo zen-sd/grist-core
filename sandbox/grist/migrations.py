@@ -1400,3 +1400,13 @@ def migration46(tdset):
   return tdset.apply_doc_actions([
     add_column('_grist_Triggers', 'condition', 'Text'),
   ])
+
+
+@migration(schema_version=47)
+def migration47(tdset):
+  """
+  Adds recalcConfirm column, to let a trigger formula ask for confirmation before recalculating.
+  """
+  return tdset.apply_doc_actions([
+    add_column('_grist_Tables_column', 'recalcConfirm', 'Bool'),
+  ])

@@ -13,7 +13,7 @@ from collections import OrderedDict, namedtuple
 
 import actions
 
-SCHEMA_VERSION = 46
+SCHEMA_VERSION = 47
 
 def make_column(col_id, col_type, formula='', isFormula=False):
   return {
@@ -97,6 +97,10 @@ def schema_create_actions():
       # List of fields that should trigger a calculation of a formula in a data column. Only
       # applies when recalcWhen is RecalcWhen.DEFAULT, and defaults to the empty list.
       make_column("recalcDeps",       "RefList:_grist_Tables_column"),
+
+      # If set, changes matching recalcWhen/recalcDeps prompt the user for confirmation before
+      # the trigger formula is recalculated, instead of recalculating right away.
+      make_column("recalcConfirm",    "Bool"),
     ]),
 
     # DEPRECATED: Previously used to keep import options, and allow the user to change them.
