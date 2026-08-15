@@ -72,6 +72,19 @@ export function buildFormulaTriggers(owner: MultiHolder, column: ColumnRec, opti
     }
   }
 
+  // The state of "Ask for confirmation" checkbox, only meaningful (and shown) while
+  // applyOnChanges is checked.
+  const applyConfirm = Computed.create(owner, use => use(column.recalcConfirm))
+    .onWrite(setRecalcConfirm);
+
+  async function setRecalcConfirm(value: boolean) {
+    if (value !== column.recalcConfirm.peek()) {
+      return column._table.sendTableAction(
+        ["UpdateRecord", column.id.peek(), { recalcConfirm: value }],
+      );
+    }
+  }
+
   const docModel = column._table.docModel;
   const summaryText = Computed.create(owner, (use) => {
     if (use(column.recalcWhen) === RecalcWhen.MANUAL_UPDATES) {
@@ -115,7 +128,7 @@ export function buildFormulaTriggers(owner: MultiHolder, column: ColumnRec, opti
         testId("field-formula-apply-on-changes"),
       ),
     ),
-    dom.maybe(applyOnChanges, () =>
+    dom.maybe(applyOnChanges, () => [
       cssIndentedRow(
         cssSelectBtn(
           cssSelectSummary(dom.text(summaryText)),
@@ -128,7 +141,15 @@ export function buildFormulaTriggers(owner: MultiHolder, column: ColumnRec, opti
           },
         ),
       ),
-    ),
+      cssIndentedRow(
+        labeledSquareCheckbox(
+          applyConfirm,
+          t("Ask for confirmation"),
+          dom.boolAttr("disabled", changesDisabled),
+          testId("field-formula-confirm"),
+        ),
+      ),
+    ]),
   ];
 }
 
