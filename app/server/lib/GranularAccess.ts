@@ -177,6 +177,10 @@ const OTHER_RECOGNIZED_ACTIONS = new Set([
   "AddEmptyRule",
   "CreateViewSection",
   "RemoveViewSection",
+
+  // Suppresses recalculation of a trigger-formula column; produces no DocAction of its own, so
+  // it is checked explicitly in _checkPreventTriggerRecalcAccess rather than via DocActions.
+  "PreventTriggerRecalc",
 ]);
 
 // When an attachment is uploaded, it isn't immediately added to a cell in
@@ -937,6 +941,7 @@ export class GranularAccess implements GranularAccessForBundle {
     await this._checkIfNeedsEarlySchemaPermission(docSession, actions);
     await this._checkDuplicateTableAccess(docSession, actions);
     await this._checkAddOrUpdateAccess(docSession, actions);
+    await this._checkPreventTriggerRecalcAccess(docSession, actions);
   }
 
   /**
@@ -1528,6 +1533,24 @@ export class GranularAccess implements GranularAccessForBundle {
       accessChecks.fatal.read.throwIfNotFullyAllowed(tableAccess);
       accessChecks.fatal.update.throwIfDenied(this._focusUpdateMemos(a, tableAccess, permInfo, tableId));
       accessChecks.fatal.create.throwIfDenied(tableAccess);
+    });
+  }
+
+  /**
+   * PreventTriggerRecalc produces no DocAction (it only sets an in-memory exemption in the data
+   * engine), so it isn't caught by the DocAction-based checks that cover ordinary data actions.
+   * Require the same table-level update access a real edit to the target column would need.
+   */
+  private async _checkPreventTriggerRecalcAccess(docSession: OptDocSession, actions: UserAction[]) {
+    await applyToActionsRecursively(actions, async (a) => {
+      if (a[0] !== "PreventTriggerRecalc") { return; }
+      const tableId = validTableIdString(a[1]);
+      if (isMetadataTable(tableId)) {
+        throw new Error("PreventTriggerRecalc cannot be used on metadata tables");
+      }
+      const tableAccess = await this.getTableAccess(docSession, tableId);
+      const permInfo = await this._getAccess(docSession);
+      accessChecks.fatal.update.throwIfDenied(this._focusUpdateMemos(a, tableAccess, permInfo, tableId));
     });
   }
 
