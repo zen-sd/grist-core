@@ -5,8 +5,11 @@ import { GristDoc } from "app/client/components/GristDoc";
 import { UnsavedChange } from "app/client/components/UnsavedChanges";
 import { makeT } from "app/client/lib/localization";
 import { DataRowModel } from "app/client/models/DataRowModel";
+import { ColumnRec } from "app/client/models/entities/ColumnRec";
 import { ViewFieldRec } from "app/client/models/entities/ViewFieldRec";
 import { reportError } from "app/client/models/errors";
+import { findConfirmTriggers } from "app/client/ui/TriggerFormulas";
+import { confirmModal } from "app/client/ui2018/modals";
 import { showTooltipToCreateFormula } from "app/client/widgets/EditorTooltip";
 import { FloatingEditor } from "app/client/widgets/FloatingEditor";
 import { FormulaEditor, getFormulaError } from "app/client/widgets/FormulaEditor";
@@ -49,9 +52,29 @@ export function saveWithoutEditor(
 // Set the given field of editRow to value, only if different from the current value of the cell.
 export async function setAndSave(editRow: DataRowModel, field: ViewFieldRec, value: CellValue): Promise<void> {
   const obs = editRow.cells[field.colId()];
-  if (!isEqual(value, obs.peek())) {
-    return obs.setAndSave(value);
-  }
+  if (isEqual(value, obs.peek())) { return; }
+  const triggers = findConfirmTriggers(field.column.peek());
+  if (triggers.length > 0 && !(await confirmTriggerRecalc(triggers))) { return; }
+  return obs.setAndSave(value);
+}
+
+// Ask the user to confirm that the given trigger-formula columns should recalculate. Resolves
+// to true if the user confirms, false if they cancel (Escape, click away, or Cancel button).
+function confirmTriggerRecalc(triggers: ColumnRec[]): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const names = triggers.map(col => col.label.peek()).join(", ");
+    confirmModal(
+      t("Recalculate trigger formula?"),
+      t("Recalculate"),
+      () => resolve(true),
+      {
+        explanation: t(
+          "This will recalculate {{columns}}, which may overwrite its current value.", { columns: names },
+        ),
+        modalOptions: { onCancel: () => resolve(false) },
+      },
+    );
+  });
 }
 
 /**

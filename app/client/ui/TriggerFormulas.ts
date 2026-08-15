@@ -23,6 +23,25 @@ import type { TableRec } from "app/client/models/entities/TableRec";
 const t = makeT("TriggerFormulas");
 
 /**
+ * Returns trigger-formula columns in the same table as `column`, other than `column` itself,
+ * that have "Ask for confirmation" enabled and would recalculate if `column` changes.
+ */
+export function findConfirmTriggers(column: ColumnRec): ColumnRec[] {
+  const colRef = column.id.peek();
+  const allColumns = column.table.peek().columns.peek().peek();
+  return allColumns.filter((col) => {
+    if (col.id.peek() === colRef || !col.recalcConfirm.peek()) { return false; }
+    const when = col.recalcWhen.peek();
+    if (when === RecalcWhen.MANUAL_UPDATES) { return true; }
+    if (when === RecalcWhen.DEFAULT) {
+      const deps = decodeObject(col.recalcDeps.peek()) as number[] | null;
+      return Boolean(deps?.includes(colRef));
+    }
+    return false;
+  });
+}
+
+/**
  * Build UI to select triggers for formulas in data columns (such for default values).
  */
 export function buildFormulaTriggers(owner: MultiHolder, column: ColumnRec, options: {
