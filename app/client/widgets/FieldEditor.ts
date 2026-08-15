@@ -15,7 +15,7 @@ import { FloatingEditor } from "app/client/widgets/FloatingEditor";
 import { FormulaEditor, getFormulaError } from "app/client/widgets/FormulaEditor";
 import { IEditorCommandGroup, IEditorConstructor, NewBaseEditor } from "app/client/widgets/NewBaseEditor";
 import { asyncOnce } from "app/common/AsyncCreate";
-import { CellValue } from "app/common/DocActions";
+import { CellValue, UserAction } from "app/common/DocActions";
 import { isVersions } from "app/common/gristTypes";
 import * as gutil from "app/common/gutil";
 import { CursorPos } from "app/plugin/GristAPI";
@@ -54,8 +54,21 @@ export async function setAndSave(editRow: DataRowModel, field: ViewFieldRec, val
   const obs = editRow.cells[field.colId()];
   if (isEqual(value, obs.peek())) { return; }
   const triggers = findConfirmTriggers(field.column.peek());
-  if (triggers.length > 0 && !(await confirmTriggerRecalc(triggers))) { return; }
-  return obs.setAndSave(value);
+  if (triggers.length === 0 || await confirmTriggerRecalc(triggers)) {
+    return obs.setAndSave(value);
+  }
+
+  // The user declined: still save the edit, but tell the engine not to recalculate the
+  // confirm-gated trigger columns for this particular change. Only possible for existing rows,
+  // since a newly added row's id isn't known on the client until the AddRecord action completes;
+  // for a new row, we fall back to not saving the edit at all.
+  if (editRow._isAddRow.peek()) { return; }
+  const rowId = editRow.getRowId();
+  const tableId = field.column.peek().table.peek().tableId.peek();
+  await editRow._table.sendTableActions([
+    ["UpdateRecord", rowId, { [field.colId()]: value }],
+    ...triggers.map((col): UserAction => ["PreventTriggerRecalc", tableId, col.colId.peek(), [rowId]]),
+  ]);
 }
 
 // Ask the user to confirm that the given trigger-formula columns should recalculate. Resolves
