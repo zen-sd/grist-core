@@ -590,6 +590,20 @@ class UserActions(object):
           self._engine.prevent_recalc(col_obj.node, row_ids, should_prevent=False)
 
 
+  @useraction
+  def PreventTriggerRecalc(self, table_id, col_id, row_ids):
+    """
+    Marks a trigger-formula column as exempt from recalculation for the given rows, for the
+    rest of the current action bundle. Used to let an edit to a column it depends on go through
+    while leaving the trigger formula's own value untouched (e.g. when the user is asked for
+    confirmation and declines). Produces no doc action or undo entry, since nothing about the
+    trigger column actually changes. Must be the last useraction in its bundle to take effect,
+    since exemptions are cleared at the start of each useraction (see Engine.prevent_recalc).
+    """
+    table = self._engine.tables[table_id]
+    col_obj = table.get_column(col_id)
+    self._engine.prevent_recalc(col_obj.node, row_ids, should_prevent=True)
+
   # Helper to perform doBulkUpdateRecord using record update value pairs. This saves
   #  the steps of separating the value pairs into row ids and column values.
   # The record_values_pairs should be given as a list of tuples, the first element of each

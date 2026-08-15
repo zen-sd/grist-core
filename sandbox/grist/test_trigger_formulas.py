@@ -5,6 +5,7 @@ import time
 import objtypes
 import testutil
 import test_engine
+import useractions
 from schema import RecalcWhen
 
 # pylint: disable=line-too-long
@@ -104,6 +105,20 @@ class TestTriggerFormulas(test_engine.EngineTestCase):
       [1,   "Dolphin", 3,       "Arthur",    "Arthur",  "Neptune",   "Neptune",    "Indian"  ],
       [2,   "Shark",   2,       "Poseidon",  "",        "Poseidon",  "Poseidon",   "Atlantic"],
       [3,   "Squid",   4,       "Watatsumi", "",        "Poseidon",  "Poseidon",   "Arctic"  ],
+    ])
+
+  def test_prevent_trigger_recalc(self):
+    # A PreventTriggerRecalc action bundled with the triggering update lets the update through
+    # while leaving the exempted trigger-formula column untouched; other trigger columns still
+    # recalculate normally.
+    self.load_sample(self.sample)
+    self.engine.apply_user_actions([
+      useractions.from_repr(['UpdateRecord', 'Creatures', 1, {'Ocean': 3}]),
+      useractions.from_repr(['PreventTriggerRecalc', 'Creatures', 'BossUpd', [1]]),
+    ])
+    self.assertTableData("Creatures", rows="subset", data=[
+      ["id","Name",    "Ocean", "BossDef",   "BossNvr", "BossUpd",   "BossAll",   "OceanName"],
+      [1,   "Dolphin", 3,       "Arthur",    "Arthur",  "Arthur",    "Neptune",    "Indian"  ],
     ])
 
   def test_recalc_with_direct_update(self):
