@@ -64,10 +64,9 @@ export async function setAndSave(editRow: DataRowModel, field: ViewFieldRec, val
   // for a new row, we fall back to not saving the edit at all.
   if (editRow._isAddRow.peek()) { return; }
   const rowId = editRow.getRowId();
-  const tableId = field.column.peek().table.peek().tableId.peek();
   await editRow._table.sendTableActions([
     ["UpdateRecord", rowId, { [field.colId()]: value }],
-    ...triggers.map((col): UserAction => ["PreventTriggerRecalc", tableId, col.colId.peek(), [rowId]]),
+    ...triggers.map((col): UserAction => ["PreventTriggerRecalc", col.colId.peek(), [rowId]]),
   ]);
 }
 
